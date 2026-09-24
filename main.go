@@ -34,6 +34,14 @@ const applicationID = "SmartEduDownloader-5f30b350-7d57-47db-8f24-99d6fe0eb9d3"
 
 const officialLoginURL = "https://auth.smartedu.cn/uias/login"
 
+const (
+	defaultWindowWidth  = 1280
+	defaultWindowHeight = 800
+	minimumWindowWidth  = 640
+	minimumWindowHeight = 400
+	windowScreenMargin  = 96
+)
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		showFatalError("程序启动失败：\n" + err.Error())
@@ -130,15 +138,23 @@ func runDesktop(executableDir, dataRoot string) error {
 	messages.MissingRequirements = "缺少运行组件"
 	messages.DownloadPage = "本程序需要 Microsoft Edge WebView2 运行时。请安装后重新打开程序。最低版本："
 	messages.ContactAdmin = "本程序需要 Microsoft Edge WebView2 运行时，请联系管理员安装。"
+	var initialWindowFit sync.Once
 
 	err = wails.Run(&options.App{
-		Title: "智教教材下载器", Width: 1280, Height: 800, MinWidth: 1024, MinHeight: 680,
+		Title: "智教教材下载器", Width: defaultWindowWidth, Height: defaultWindowHeight,
+		MinWidth: minimumWindowWidth, MinHeight: minimumWindowHeight, StartHidden: true,
 		BackgroundColour: options.NewRGB(246, 249, 254),
 		AssetServer:      &assetserver.Options{Assets: loadAssets()},
 		Bind:             []interface{}{desktopApp},
 		OnStartup: func(ctx context.Context) {
 			desktopApp.Startup(ctx)
 			window.SetContext(ctx)
+		},
+		OnDomReady: func(ctx context.Context) {
+			initialWindowFit.Do(func() {
+				fitAndShowWindow(ctx)
+				window.MarkReady()
+			})
 		},
 		OnBeforeClose: func(ctx context.Context) bool {
 			if desktopApp.ShutdownInProgress() {
@@ -167,6 +183,45 @@ func runDesktop(executableDir, dataRoot string) error {
 		return err
 	}
 	return nil
+}
+
+func fitAndShowWindow(ctx context.Context) {
+	screens, screenErr := wailsruntime.ScreenGetAll(ctx)
+	width, height := windowSizeForScreens(screens, screenErr)
+	wailsruntime.WindowSetSize(ctx, width, height)
+	wailsruntime.WindowCenter(ctx)
+	wailsruntime.WindowShow(ctx)
+}
+
+func windowSizeForScreens(screens []wailsruntime.Screen, screenErr error) (int, int) {
+	if screenErr != nil {
+		slog.Warn("部分显示器信息不可用", "error", screenErr)
+	}
+	selected := -1
+	for index := range screens {
+		screen := screens[index]
+		if screen.Size.Width <= 0 || screen.Size.Height <= 0 {
+			continue
+		}
+		if selected == -1 || screen.IsPrimary {
+			selected = index
+		}
+		if screen.IsCurrent {
+			selected = index
+			break
+		}
+	}
+	if selected == -1 {
+		return minimumWindowWidth, minimumWindowHeight
+	}
+	screen := screens[selected]
+	return fitWindowSize(screen.Size.Width, screen.Size.Height)
+}
+
+func fitWindowSize(screenWidth, screenHeight int) (int, int) {
+	width := min(defaultWindowWidth, screenWidth-windowScreenMargin)
+	height := min(defaultWindowHeight, screenHeight-windowScreenMargin)
+	return max(minimumWindowWidth, width), max(minimumWindowHeight, height)
 }
 
 func formatUIError(err error) any {
@@ -241,19 +296,37 @@ func runSmokeMode(executableDir, dataRoot string) error {
 }
 
 type windowRuntime struct {
-	mutex   sync.RWMutex
-	ctx     context.Context
-	pending bool
+	mutex          sync.RWMutex
+	ctx            context.Context
+	pending        bool
+	ready          bool
+	activateWindow func(context.Context)
 }
 
 func (window *windowRuntime) SetContext(ctx context.Context) {
 	window.mutex.Lock()
 	window.ctx = ctx
-	pending := window.pending
-	window.pending = false
+	pending := window.pending && window.ready
+	if pending {
+		window.pending = false
+	}
 	window.mutex.Unlock()
 	if pending {
-		window.Activate()
+		window.activate(ctx)
+	}
+}
+
+func (window *windowRuntime) MarkReady() {
+	window.mutex.Lock()
+	window.ready = true
+	ctx := window.ctx
+	pending := window.pending && ctx != nil
+	if pending {
+		window.pending = false
+	}
+	window.mutex.Unlock()
+	if pending {
+		window.activate(ctx)
 	}
 }
 
@@ -266,12 +339,20 @@ func (window *windowRuntime) Context() (context.Context, bool) {
 func (window *windowRuntime) Activate() {
 	window.mutex.Lock()
 	ctx := window.ctx
-	if ctx == nil {
+	if ctx == nil || !window.ready {
 		window.pending = true
 		window.mutex.Unlock()
 		return
 	}
 	window.mutex.Unlock()
+	window.activate(ctx)
+}
+
+func (window *windowRuntime) activate(ctx context.Context) {
+	if window.activateWindow != nil {
+		window.activateWindow(ctx)
+		return
+	}
 	wailsruntime.WindowUnminimise(ctx)
 	wailsruntime.WindowShow(ctx)
 }
@@ -280,5 +361,6 @@ func (window *windowRuntime) Clear() {
 	window.mutex.Lock()
 	window.ctx = nil
 	window.pending = false
+	window.ready = false
 	window.mutex.Unlock()
 }
