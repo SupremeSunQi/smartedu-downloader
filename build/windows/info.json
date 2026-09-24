@@ -1,0 +1,15 @@
+{
+  "fixed": {
+    "file_version": "0.1.0.0"
+  },
+  "info": {
+    "0000": {
+      "ProductVersion": "0.1.0",
+      "CompanyName": "SmartEdu Downloader Contributors",
+      "FileDescription": "SmartEdu Downloader",
+      "LegalCopyright": "Copyright 2026 SmartEdu Downloader Contributors",
+      "ProductName": "SmartEdu Downloader",
+      "Comments": "Portable textbook downloader"
+    }
+  }
+}

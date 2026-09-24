@@ -1,0 +1,21 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "SmartEdu Downloader",
+  "outputfilename": "SmartEduDownloader",
+  "frontend:install": "npm ci",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "wailsjsdir": "frontend/wailsjs",
+  "author": {
+    "name": "SmartEdu Downloader Contributors",
+    "email": ""
+  },
+  "info": {
+    "companyName": "SmartEdu Downloader Contributors",
+    "productName": "SmartEdu Downloader",
+    "productVersion": "0.1.0",
+    "copyright": "Copyright 2026 SmartEdu Downloader Contributors",
+    "comments": "Portable textbook downloader for the National Smart Education Platform"
+  }
+}

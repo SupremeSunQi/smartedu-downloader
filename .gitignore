@@ -1,0 +1,33 @@
+# Local development and runtime data
+.worktrees/
+.tools/
+.smartedu-data/
+/downloads/
+*.part
+*.pdf
+*.log
+.env
+.env.*
+!.env.example
+
+# Frontend dependencies and generated bindings
+frontend/node_modules/
+frontend/dist/
+frontend/wailsjs/
+frontend/package.json.md5
+frontend/coverage/
+
+# Packaged output and release artifacts
+build/bin/
+*.exe
+*.msi
+*.zip
+*.7z
+
+# Editors and operating systems
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+Desktop.ini
+.DS_Store
